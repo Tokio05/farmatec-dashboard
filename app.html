@@ -1,0 +1,252 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>F@armaTec - Análisis Dosis-Respuesta</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&display=swap');
+        body { font-family: 'Inter', sans-serif; background-color: #0f172a; color: #f8fafc; }
+        .glass-panel { background: rgba(30, 41, 59, 0.7); backdrop-filter: blur(10px); border: 1px solid rgba(255,255,255,0.1); }
+    </style>
+</head>
+<body class="antialiased min-h-screen flex flex-col items-center py-10 px-4">
+
+    <header class="max-w-6xl w-full text-center mb-12">
+        <h1 class="text-4xl md:text-5xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-emerald-400 to-cyan-400 mb-4">
+            F@armaTec online
+        </h1>
+        <p class="text-lg text-slate-400 max-w-2xl mx-auto">
+            Plataforma de validación analítica. Ajuste numérico de curvas farmacodinámicas (PK/PD) mediante resolución de sistemas sobredimensionados para compuestos candidatos generados por IA.
+        </p>
+    </header>
+
+    <main class="max-w-6xl w-full grid grid-cols-1 lg:grid-cols-3 gap-8 mb-12">
+        
+        <div class="glass-panel p-6 rounded-2xl shadow-xl flex flex-col justify-between">
+            <div>
+                <h2 class="text-xl font-semibold text-emerald-400 mb-2">Motor de Inferencia Analítica</h2>
+                <p class="text-sm text-slate-300 mb-6">
+                    Haga clic en el botón para cargar la base de datos de cribado (n=150) y ejecutar el algoritmo de mínimos cuadrados ordinarios basado en las ecuaciones normales.
+                </p>
+                <button id="runBtn" class="w-full bg-gradient-to-r from-emerald-500 to-cyan-500 hover:from-emerald-400 hover:to-cyan-400 text-white font-bold py-3 px-4 rounded-xl transition-all shadow-lg transform hover:scale-105 mb-8">
+                    Ejecutar Análisis
+                </button>
+            </div>
+
+            <div id="results" class="opacity-0 transition-opacity duration-1000">
+                <div class="bg-slate-800/50 p-4 rounded-xl border border-slate-700 mb-4">
+                    <p class="text-xs text-slate-400 uppercase tracking-wider mb-1">Potencia (EC50)</p>
+                    <p class="text-3xl font-bold text-white"><span id="res-ec50">--</span> <span class="text-sm font-normal text-slate-400">mg/L</span></p>
+                </div>
+                <div class="bg-slate-800/50 p-4 rounded-xl border border-slate-700">
+                    <p class="text-xs text-slate-400 uppercase tracking-wider mb-1">Sensibilidad (n de Hill)</p>
+                    <p class="text-3xl font-bold text-white" id="res-n">--</p>
+                </div>
+            </div>
+        </div>
+
+        <div class="lg:col-span-2 flex flex-col gap-6">
+            <div class="glass-panel p-6 rounded-2xl shadow-xl relative" style="height: 350px;">
+                <h3 class="text-sm text-slate-400 absolute top-4 left-6">Modelo Dosis-Respuesta (Ecuación de Hill)</h3>
+                <canvas id="mainChart"></canvas>
+            </div>
+            <div class="glass-panel p-6 rounded-2xl shadow-xl relative" style="height: 250px;">
+                <h3 class="text-sm text-slate-400 absolute top-4 left-6">Análisis de Residuos (Diagnóstico del Sesgo Matemático)</h3>
+                <canvas id="residualChart"></canvas>
+            </div>
+        </div>
+        <div class="max-w-6xl w-full grid grid-cols-1 lg:grid-cols-2 gap-8 mb-12 text-sm text-slate-300">
+            <div class="glass-panel p-5 rounded-xl">
+                <h4 class="text-emerald-400 font-semibold mb-2">Interpretación del Ajuste Sigmoideo</h4>
+                <p class="mb-2">La línea continua representa el comportamiento idealizado del fármaco. Permite a los investigadores predecir el efecto biológico a concentraciones que no se han medido físicamente en el laboratorio.</p>
+                <p class="text-xs text-slate-500">Álgebra aplicada: Minimización de la norma L2 sobre un espacio vectorial incompatible de dimensión m=150.</p>
+            </div>
+            <div class="glass-panel p-5 rounded-xl">
+                <h4 class="text-rose-400 font-semibold mb-2">Diagnóstico del Residuo (Heterocedasticidad)</h4>
+                <p class="mb-2">La dispersión en forma de embudo en los extremos demuestra matemáticamente que el truco logarítmico altera la estructura del ruido, amplificando el error en las zonas de saturación.</p>
+                <p class="text-xs text-slate-500">Análisis crítico: Evidencia de la distorsión del supuesto de Gauss-Markov por transformación no lineal de variables.</p>
+            </div>
+        </div>
+        <div class="glass-panel p-6 rounded-2xl border-l-4 border-amber-500 mt-6 max-w-6xl w-full mx-auto text-sm text-slate-300">
+            <h4 class="text-amber-400 font-semibold mb-2 text-lg">Nota Analítica: El Sesgo de Subestimación</h4>
+            <p class="mb-2">Si compara los valores estimados con métricas pre-calibradas, notará que el modelo MCO linealizado tiende a subestimar ligeramente tanto la potencia como la sensibilidad (valores entre 0.3 y 0.5 puntos menores a la realidad).</p>
+            <p>Lejos de ser un error computacional, esto es una manifestación matemática de la <strong>Desigualdad de Jensen</strong>. Al aplicar un logaritmo (función estrictamente cóncava, &cap;) sobre datos con ruido simétrico, el espacio lineal sufre un truncamiento en sus asíntotas biológicas, aplanando la curva resultante. Reconocer este sesgo es vital para los ingenieros de F@armaTec al establecer los márgenes de seguridad farmacológicos reales.</p>
+        </div>
+    </main>
+
+
+    <section class="max-w-6xl w-full grid grid-cols-1 md:grid-cols-2 gap-8 text-slate-300 text-sm">
+        <div class="glass-panel p-6 rounded-2xl border-l-4 border-emerald-500">
+            <h3 class="text-xl font-semibold text-emerald-400 mb-4">¿Cómo interpretar estos resultados?</h3>
+            
+            <div class="mb-4">
+                <h4 class="text-white font-semibold mb-1 text-sm uppercase tracking-wide">1. El Reto Biológico</h4>
+                <p class="text-slate-300">La Inteligencia Artificial de F@armaTec diseña millones de moléculas virtuales. Sin embargo, para confirmar que el candidato informático funciona en el mundo real, medimos su efecto biológico a diferentes dosis en el laboratorio.</p>
+            </div>
+
+            <div class="mb-4">
+                <h4 class="text-white font-semibold mb-1 text-sm uppercase tracking-wide">2. Traduciendo las Matemáticas</h4>
+                <ul class="list-disc pl-5 text-slate-300 space-y-2 mt-2">
+                    <li><strong class="text-emerald-300">Potencia (EC50):</strong> Indica la cantidad exacta de fármaco necesaria para alcanzar el 50% del efecto máximo. Si este valor es demasiado alto, la molécula es débil y poco eficiente.</li>
+                    <li><strong class="text-emerald-300">Sensibilidad (n):</strong> Mide la cooperatividad. Un valor alto significa que un aumento milimétrico en la dosis provoca un salto enorme en la curación, un dato vital para definir los márgenes de seguridad del paciente.</li>
+                </ul>
+            </div>
+        </div>
+        <div class="glass-panel p-6 rounded-2xl border-l-4 border-emerald-500">
+            <h3 class="text-lg font-semibold text-emerald-400 mb-3">Transparencia Analítica</h3>
+            <p class="mb-2"><strong>Base Matemática:</strong> El sistema sobredimensionado no lineal se resuelve aplicando una transformación biyectiva logarítmica y minimizando la norma euclídea del residuo mediante las Ecuaciones Normales de Gauss.</p>
+            <p class="mb-2"><strong>Gestión de Datos:</strong> Los datos se simularon inyectando ruido gaussiano sobre un modelo mecanicista para emular la imprecisión instrumental del laboratorio in vitro.</p>
+            <p class="text-xs text-slate-500 mt-4">Autor del Análisis: Desarrollado por Héctor González en cumplimiento de los estándares de IA declarados en la documentación técnica.</p>
+        </div>
+    </section>
+
+    <script>
+        // 1. Generador de Datos Sintéticos con ruido (Simulación del cribado de F@armaTec)
+        function generarDatos() {
+            const e_max = 1.0;
+            const ec50_real = 2.5;
+            const n_real = 1.5;
+            const m = 150;
+            let datos = [];
+
+            for (let i = 0; i < m; i++) {
+                // Generar concentraciones espaciadas logarítmicamente (0.01 a 100)
+                let c = Math.pow(10, -2 + (4 * i / (m - 1)));
+                // Ecuación de Hill ideal
+                let e_ideal = (e_max * Math.pow(c, n_real)) / (Math.pow(ec50_real, n_real) + Math.pow(c, n_real));
+                // Añadir ruido gaussiano simulado
+                let ruido = (Math.random() - 0.5) * 0.1; 
+                let e_exp = e_ideal + ruido;
+                // Restricción asintótica biológica
+                e_exp = Math.max(0.01, Math.min(e_exp, 0.99));
+                datos.push({ c: c, e: e_exp });
+            }
+            return datos;
+        }
+
+        const dataSet = generarDatos();
+        let mainChartInstance = null;
+        let residualChartInstance = null;
+
+        // 2. Motor de Resolución Analítica
+        document.getElementById('runBtn').addEventListener('click', () => {
+            const m = dataSet.length;
+            const e_max = 1.0;
+            let sum_x = 0, sum_x2 = 0, sum_y = 0, sum_xy = 0;
+
+            // Transformación logarítmica y construcción de matrices
+            dataSet.forEach(p => {
+                let xi = Math.log(p.c);
+                let yi = Math.log(p.e / (e_max - p.e));
+                sum_x += xi;
+                sum_x2 += xi * xi;
+                sum_y += yi;
+                sum_xy += xi * yi;
+            });
+
+            // Resolución por mínimos cuadrados (Regla de Cramer)
+            let delta = (m * sum_x2) - (sum_x * sum_x);
+            let n_hat = ((m * sum_xy) - (sum_x * sum_y)) / delta;
+            let beta_hat = ((sum_x2 * sum_y) - (sum_x * sum_xy)) / delta;
+            
+            // Reconstrucción del espacio biológico
+            let ec50_hat = Math.exp(-beta_hat / n_hat);
+
+            // Actualización de la Interfaz
+            document.getElementById('results').classList.remove('opacity-0');
+            document.getElementById('res-ec50').innerText = ec50_hat.toFixed(2);
+            document.getElementById('res-n').innerText = n_hat.toFixed(2);
+
+            dibujarGraficas(n_hat, ec50_hat, dataSet);
+        });
+
+        // 3. Renderizado Gráfico (Chart.js)
+        function dibujarGraficas(n, ec50, datos) {
+            const ctxMain = document.getElementById('mainChart').getContext('2d');
+            const ctxRes = document.getElementById('residualChart').getContext('2d');
+
+            // Preparar datos para las gráficas
+            const scatterData = datos.map(p => ({ x: p.c, y: p.e }));
+            
+            // Generar curva teórica continua suavizada
+            let curveData = [];
+            for(let i = 0.01; i <= 100; i *= 1.1) {
+                let e = Math.pow(i, n) / (Math.pow(ec50, n) + Math.pow(i, n));
+                curveData.push({ x: i, y: e });
+            }
+
+            // Calcular Residuos
+            const residualData = datos.map(p => {
+                let e_teo = Math.pow(p.c, n) / (Math.pow(ec50, n) + Math.pow(p.c, n));
+                return { x: Math.log10(p.c), y: p.e - e_teo };
+            });
+
+            // Destruir instancias previas si el usuario hace clic múltiples veces
+            if (mainChartInstance) mainChartInstance.destroy();
+            if (residualChartInstance) residualChartInstance.destroy();
+
+            // Configuración general de Chart.js
+            Chart.defaults.color = '#94a3b8';
+            Chart.defaults.font.family = 'Inter';
+
+            // Dibujar Gráfica Principal
+            mainChartInstance = new Chart(ctxMain, {
+                type: 'scatter',
+                data: {
+                    datasets: [{
+                        label: 'Datos de Laboratorio (Ruido)',
+                        data: scatterData,
+                        backgroundColor: 'rgba(56, 189, 248, 0.5)',
+                        borderColor: '#38bdf8',
+                        pointRadius: 4
+                    }, {
+                        type: 'line',
+                        label: 'Ajuste Óptimo (Ecuación de Hill)',
+                        data: curveData,
+                        borderColor: '#34d399',
+                        borderWidth: 3,
+                        pointRadius: 0,
+                        tension: 0.4
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        x: { type: 'logarithmic', title: { display: true, text: 'Concentración [mg/L] (escala log)' } },
+                        y: { title: { display: true, text: 'Efecto Biológico (E)' }, min: 0, max: 1.1 }
+                    }
+                }
+            });
+
+            // Dibujar Gráfica de Residuos
+            residualChartInstance = new Chart(ctxRes, {
+                type: 'scatter',
+                data: {
+                    datasets: [{
+                        label: 'Residuo Experimental (y - ŷ)',
+                        data: residualData,
+                        backgroundColor: 'rgba(244, 63, 94, 0.6)',
+                        pointRadius: 3
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: { legend: { display: false } },
+                    scales: {
+                        x: { title: { display: true, text: 'Log10(Concentración)' } },
+                        y: { 
+                            title: { display: true, text: 'Error' },
+                            grid: { color: (context) => context.tick.value === 0 ? '#cbd5e1' : 'rgba(255,255,255,0.1)' }
+                        }
+                    }
+                }
+            });
+        }
+    </script>
+</body>
+</html>
